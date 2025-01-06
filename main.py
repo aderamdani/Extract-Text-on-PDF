@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 import PyPDF2
+import webbrowser  # Import webbrowser to open email client
 
 class PDFExtractorApp:
     def __init__(self, root):
@@ -48,6 +49,14 @@ class PDFExtractorApp:
         self.tree.heading("Date", text="Date")
         self.tree.heading("Score", text="Score")
         self.tree.pack(pady=20, fill=tk.BOTH, expand=True)
+
+        # Label untuk informasi aplikasi dengan hyperlink
+        self.info_label = tk.Label(self.root, text="Dibuat oleh Ade Ramdani", fg="blue", cursor="hand2", bg="#f0f0f0")
+        self.info_label.pack(pady=10)
+        self.info_label.bind("<Button-1>", self.open_email)  # Bind click event to open email
+
+    def open_email(self, event):
+        webbrowser.open("mailto:mr.aderamdani@gmail.com")  # Open email client
 
     def select_input_pdf(self):
         file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
