@@ -17,7 +17,8 @@ Sebelum menjalankan aplikasi ini, pastikan Anda memiliki Python 3.x terinstal di
 
 1. **Clone Repositori**
    ```bash
-   git clone https://github.com/aderamdani/Extract-Text-on-PDF.git cd Extract-Text-on-PDF
+   git clone https://github.com/aderamdani/Extract-Text-on-PDF.git 
+   cd Extract-Text-on-PDF
    ```
 
 2. **Instal Dependensi**: Anda dapat menginstal dependensi yang diperlukan dengan menggunakan pip. Jalankan perintah berikut:
