@@ -5,6 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 import pandas as pd
 import PyPDF2
 import webbrowser  # Import webbrowser to open email client
+from datetime import datetime
 
 class PDFExtractorApp:
     def __init__(self, root):
@@ -40,14 +41,12 @@ class PDFExtractorApp:
         self.export_button.pack(pady=10)
 
         # Treeview untuk menampilkan hasil ekstraksi
-        self.tree = ttk.Treeview(self.root, columns=("Name", "Email", "Company", "Department", "Job Title", "Date", "Score"), show='headings')
-        self.tree.heading("Name", text="Name")
+        self.tree = ttk.Treeview(self.root, columns=("Full Name", "Email", "Company/University", "Date", "Your Score"), show='headings')
+        self.tree.heading("Full Name", text="Full Name")
         self.tree.heading("Email", text="Email")
-        self.tree.heading("Company", text="Company")
-        self.tree.heading("Department", text="Department")
-        self.tree.heading("Job Title", text="Job Title")
+        self.tree.heading("Company/University", text="Company/University")
         self.tree.heading("Date", text="Date")
-        self.tree.heading("Score", text="Score")
+        self.tree.heading("Your Score", text="Your Score")
         self.tree.pack(pady=20, fill=tk.BOTH, expand=True)
 
         # Label untuk informasi aplikasi dengan hyperlink
@@ -78,61 +77,102 @@ class PDFExtractorApp:
         self.export_button.config(state=tk.NORMAL)
 
     def extract_text(self, input_pdf):
-        with open(input_pdf, "rb") as file:
-            reader = PyPDF2.PdfReader(file)
-            text = ""
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
+        try:
+            with open(input_pdf, "rb") as file:
+                reader = PyPDF2.PdfReader(file)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
 
-            self.parse_text(text)
+                self.parse_text(text)
+        except PyPDF2.errors.PdfReadError:
+            messagebox.showerror("Error", "Gagal membaca file PDF. Pastikan file PDF valid.")
+        except FileNotFoundError:
+            messagebox.showerror("Error", "File PDF tidak ditemukan.")
+
 
     def parse_text(self, text):
-        # Regex pattern to extract required fields
-        pattern = r"Name\s*([^\n]*)\s*Email\s*([^\n]*)\s*Company\s*([^\n]*)\s*Department\s*([^\n]*)\s*Job Title\s*([^\n]*)\s*Date/Time:\s*([^\n]*)\s*Answered:\s*([^\n]*)\s*Your Score:\s*([^\n]*)\s*Passing Score:\s*([^\n]*)\s*Time Spent:\s*([^\n]*)\s*Result\s*([^\n]*)"
+        # Regex pattern to extract required fields (without Time Spent and Result)
+        pattern = r"Full Name\s*([^\n]*)\s*Email\s*([^\n]*)\s*Company/University\s*([^\n]*)\s*Date/Time:\s*([^\n]*)\s*Answered:\s*[^\n]*\s*Your Score:\s*([^\n]*)\s*Passing Score:\s*[^\n]*\s*Time Spent:\s*[^\n]*\s*Result\s*[^\n]*"
 
-        matches = re.findall(pattern, text, re.DOTALL)  # Use DOTALL to match across multiple lines
+        matches = re.findall(pattern, text, re.DOTALL)
 
         for match in matches:
-            # Extract and transform data
-            date_time = match[5].strip()
-            date_only = date_time.split(' ')[0] + ' ' + date_time.split(' ')[1] + ' ' + date_time.split(' ')[2]  # Get only the date part
-
-            score_raw = match[7].strip()  # Get the raw score string
-            score_value = score_raw.split('(')[-1].split('%')[0].strip()  # Extract the percentage value
-
-            # Convert score to integer and remove decimal part
-            if score_value.replace('.', '', 1).isdigit():  # Check if it's a valid number
-                score_value = int(float(score_value))  # Convert to float first, then to int to remove decimal
-            else:
-                score_value = 0  # Default to 0 if not found
-
             extracted_data = {
-                "Name": match[0].strip(),
+                "Full Name": match[0].strip(),
                 "Email": match[1].strip(),
-                "Company": match[2].strip(),
-                "Department": match[3].strip(),
-                "Job Title": match[4].strip(),
-                "Date": date_only,  # Use only the date
-                "Score": score_value  # Store the extracted score
+                "Company/University": match[2].strip(),
+                "Date": self.format_date(match[3].strip()),  # Format the date
+                "Your Score": self.extract_percentage(match[4].strip()),  # Extract percentage from Your Score
             }
             self.data.append(extracted_data)
 
-            # Insert data into the treeview
-            self.tree.insert("", "end", values=(extracted_data["Name"], extracted_data["Email"], extracted_data["Company"],
-                                                extracted_data["Department"], extracted_data["Job Title"],
-                                                extracted_data["Date"], extracted_data["Score"]))
+            # Insert data into the treeview (without Time Spent and Result)
+            self.tree.insert("", "end", values=(extracted_data["Full Name"], extracted_data["Email"], extracted_data["Company/University"],
+                                                extracted_data["Date"], extracted_data["Your Score"]))
 
         messagebox.showinfo("Success", f"{len(self.data)} records extracted successfully!")
 
+    def extract_percentage(self, score):
+        # Extract the percentage value from the score string
+        match = re.search(r'(\d+)%', score)
+        if match:
+            return match.group(1)  # Return the percentage value as a string
+        return score  # Return the original score if no percentage is found
+
+    def format_date(self, date_str):
+        # Remove time from the date string
+        date_only = date_str.split()[0:3]  # Get the first three parts (day, month, year)
+        date_str = " ".join(date_only)  # Join them back into a string
+
+        # Define month mappings for conversion
+        month_map_id = {
+            "Januari": "01", "Februari": "02", "Maret": "03", "April": "04",
+            "Mei": "05", "Juni": "06", "Juli": "07", "Agustus": "08",
+            "September": "09", "Oktober": "10", "November": "11", "Desember": "12"
+        }
+
+        month_map_en = {
+            "January": "01", "February": "02", "March": "03", "April": "04",
+            "May": "05", "June": "06", "July": "07", "August": "08",
+            "September": "09", "October": "10", "November": "11", "December": "12"
+        }
+
+        # Try to convert the date string to a datetime object
+        for month in month_map_id.keys():
+            if month in date_str:
+                month_number = month_map_id[month]
+                day_year = date_str.replace(month, month_number).strip()
+                try:
+                    date_obj = datetime.strptime(day_year, "%d %m %Y")
+                    return date_obj.strftime("%d/%m/%Y")  # Return in DD/MM/YYYY format
+                except ValueError:
+                    continue
+
+        for month in month_map_en.keys():
+            if month in date_str:
+                month_number = month_map_en[month]
+                day_year = date_str.replace(month, month_number).strip()
+                try:
+                    date_obj = datetime.strptime(day_year, "%d %m %Y")
+                    return date_obj.strftime("%d/%m/%Y")  # Return in DD/MM/YYYY format
+                except ValueError:
+                    continue
+
+        return date_str  # Return original if no conversion is possible
+
     def export_to_excel(self):
-        # Create DataFrame with the desired column order
         df = pd.DataFrame(self.data)
-        df = df[["Name", "Email", "Company", "Department", "Job Title", "Date", "Score"]]  # Set the desired column order
+        df = df[["Full Name", "Email", "Company/University", "Date", "Your Score"]]  # Columns for Excel export
         output_dir = self.output_dir_var.get()
         file_path = os.path.join(output_dir, "extract-text.xlsx")  # Set default filename
 
-        df.to_excel(file_path, index=False)
-        messagebox.showinfo("Success", f"Data exported to {file_path} successfully!")
+        try:
+            df.to_excel(file_path, index=False)
+            messagebox.showinfo("Success", f"Data exported to {file_path} successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error exporting to Excel: {e}")
+
 
 if __name__ == "__main__":
     root = tk.Tk()
